@@ -1,12 +1,12 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { InputSelect } from "./components/InputSelect"
 import { Instructions } from "./components/Instructions"
-import { Transactions } from "./components/Transactions"
 import { useEmployees } from "./hooks/useEmployees"
 import { usePaginatedTransactions } from "./hooks/usePaginatedTransactions"
 import { useTransactionsByEmployee } from "./hooks/useTransactionsByEmployee"
 import { EMPTY_EMPLOYEE } from "./utils/constants"
 import { Employee } from "./utils/types"
+import { TransactionPane } from "./components/TransactionPane"
 
 export function App() {
   const { data: employees, ...employeeUtils } = useEmployees()
@@ -24,9 +24,8 @@ export function App() {
     transactionsByEmployeeUtils.invalidateData()
 
     await employeeUtils.fetchAll()
-    await paginatedTransactionsUtils.fetchAll()
-
     setIsLoading(false)
+    await paginatedTransactionsUtils.fetchAll()
   }, [employeeUtils, paginatedTransactionsUtils, transactionsByEmployeeUtils])
 
   const loadTransactionsByEmployee = useCallback(
@@ -63,27 +62,38 @@ export function App() {
           onChange={async (newValue) => {
             if (newValue === null) {
               return
-            }
-
-            await loadTransactionsByEmployee(newValue.id)
+            } else if (newValue.id === "") {
+              await loadAllTransactions()
+            } else await loadTransactionsByEmployee(newValue.id)
           }}
         />
 
         <div className="RampBreak--l" />
 
         <div className="RampGrid">
-          <Transactions transactions={transactions} />
-
-          {transactions !== null && (
-            <button
-              className="RampButton"
-              disabled={paginatedTransactionsUtils.loading}
-              onClick={async () => {
-                await loadAllTransactions()
-              }}
-            >
-              View More
-            </button>
+          {transactions === null ? (
+            <div className="RampLoading--container">Loading...</div>
+          ) : (
+            <Fragment>
+              <div data-testid="transaction-container">
+                {transactions.map((transaction) => (
+                  <TransactionPane key={transaction.id} transaction={transaction} />
+                ))}
+              </div>
+              <button
+                className="RampButton"
+                disabled={
+                  paginatedTransactionsUtils.loading ||
+                  paginatedTransactions?.nextPage == null ||
+                  transactionsByEmployee?.length === 0
+                }
+                onClick={async () => {
+                  await loadAllTransactions()
+                }}
+              >
+                View More
+              </button>
+            </Fragment>
           )}
         </div>
       </main>

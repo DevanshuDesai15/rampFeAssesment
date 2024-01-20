@@ -2,29 +2,34 @@ import { useCallback, useState } from "react"
 import { PaginatedRequestParams, PaginatedResponse, Transaction } from "../utils/types"
 import { PaginatedTransactionsResult } from "./types"
 import { useCustomFetch } from "./useCustomFetch"
+import { useWrappedRequest } from "./useWrappedRequest"
 
 export function usePaginatedTransactions(): PaginatedTransactionsResult {
-  const { fetchWithCache, loading } = useCustomFetch()
+  const { customFetch } = useCustomFetch()
+  const { loading, wrappedRequest } = useWrappedRequest()
   const [paginatedTransactions, setPaginatedTransactions] = useState<PaginatedResponse<
     Transaction[]
   > | null>(null)
 
-  const fetchAll = useCallback(async () => {
-    const response = await fetchWithCache<PaginatedResponse<Transaction[]>, PaginatedRequestParams>(
-      "paginatedTransactions",
-      {
-        page: paginatedTransactions === null ? 0 : paginatedTransactions.nextPage,
-      }
-    )
+  const fetchAll = useCallback(
+    () =>
+      wrappedRequest(async () => {
+        const response = await customFetch<PaginatedResponse<Transaction[]>, PaginatedRequestParams>(
+          "paginatedTransactions",
+          {
+            page: paginatedTransactions === null ? 0 : paginatedTransactions.nextPage,
+          }
+        )
 
-    setPaginatedTransactions((previousResponse) => {
-      if (response === null || previousResponse === null) {
-        return response
-      }
-
-      return { data: response.data, nextPage: response.nextPage }
-    })
-  }, [fetchWithCache, paginatedTransactions])
+        setPaginatedTransactions((previousResponse) => {
+          if (previousResponse === null) {
+            return response
+          }
+          return { data: [...previousResponse.data, ...response.data], nextPage: response.nextPage }
+        })
+      }),
+    [customFetch, paginatedTransactions, wrappedRequest]
+  )
 
   const invalidateData = useCallback(() => {
     setPaginatedTransactions(null)

@@ -12,6 +12,9 @@ export type Employee = {
   firstName: string
   lastName: string
 }
+export type SuccessResponse = {
+  success: boolean
+}
 
 export type PaginatedResponse<TData> = {
   data: TData
