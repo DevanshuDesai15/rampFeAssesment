@@ -5,14 +5,16 @@ import { useEmployees } from "./hooks/useEmployees"
 import { usePaginatedTransactions } from "./hooks/usePaginatedTransactions"
 import { useTransactionsByEmployee } from "./hooks/useTransactionsByEmployee"
 import { EMPTY_EMPLOYEE } from "./utils/constants"
-import { Employee } from "./utils/types"
+import { Employee, Transaction } from "./utils/types"
 import { TransactionPane } from "./components/TransactionPane"
+import { fakeFetch } from "./utils/fetch"
 
 export function App() {
   const { data: employees, ...employeeUtils } = useEmployees()
   const { data: paginatedTransactions, ...paginatedTransactionsUtils } = usePaginatedTransactions()
   const { data: transactionsByEmployee, ...transactionsByEmployeeUtils } = useTransactionsByEmployee()
   const [isLoading, setIsLoading] = useState(false)
+  const [approvalStates, setApprovalStates] = useState(new Map<string, boolean>())
 
   const transactions = useMemo(
     () => paginatedTransactions?.data ?? transactionsByEmployee ?? null,
@@ -24,14 +26,26 @@ export function App() {
     transactionsByEmployeeUtils.invalidateData()
 
     await employeeUtils.fetchAll()
+    const result = await paginatedTransactionsUtils.fetchAll()
     setIsLoading(false)
-    await paginatedTransactionsUtils.fetchAll()
+
+    if (result) {
+      setApprovalStates(new Map(result.data.map(t => [t.id, t.approved])))
+    }
   }, [employeeUtils, paginatedTransactionsUtils, transactionsByEmployeeUtils])
 
   const loadTransactionsByEmployee = useCallback(
     async (employeeId: string) => {
       paginatedTransactionsUtils.invalidateData()
-      await transactionsByEmployeeUtils.fetchById(employeeId)
+      const result = await transactionsByEmployeeUtils.fetchById(employeeId)
+
+      if (result) {
+        setApprovalStates(prevStates => {
+          const newStates = new Map(prevStates)
+          result.forEach(t => newStates.set(t.id, t.approved))
+          return newStates
+        })
+      }
     },
     [paginatedTransactionsUtils, transactionsByEmployeeUtils]
   )
@@ -41,6 +55,11 @@ export function App() {
       loadAllTransactions()
     }
   }, [employeeUtils.loading, employees, loadAllTransactions])
+
+  const setTransactionApproval = useCallback(async (transactionId: string, newValue: boolean) => {
+    await fakeFetch("setTransactionApproval", { transactionId, value: newValue })
+    setApprovalStates(prevStates => new Map(prevStates).set(transactionId, newValue))
+  }, [])
 
   return (
     <Fragment>
@@ -62,9 +81,12 @@ export function App() {
           onChange={async (newValue) => {
             if (newValue === null) {
               return
-            } else if (newValue.id === "") {
+            }
+            if (newValue.id === EMPTY_EMPLOYEE.id) {
               await loadAllTransactions()
-            } else await loadTransactionsByEmployee(newValue.id)
+            } else {
+              await loadTransactionsByEmployee(newValue.id)
+            }
           }}
         />
 
@@ -77,16 +99,17 @@ export function App() {
             <Fragment>
               <div data-testid="transaction-container">
                 {transactions.map((transaction) => (
-                  <TransactionPane key={transaction.id} transaction={transaction} />
+                  <TransactionPane
+                    key={transaction.id}
+                    transaction={transaction}
+                    approved={approvalStates.get(transaction.id) ?? transaction.approved}
+                    setTransactionApproval={setTransactionApproval}
+                  />
                 ))}
               </div>
               <button
                 className="RampButton"
-                disabled={
-                  paginatedTransactionsUtils.loading ||
-                  paginatedTransactions?.nextPage == null ||
-                  transactionsByEmployee?.length === 0
-                }
+                disabled={paginatedTransactionsUtils.loading || paginatedTransactions?.nextPage == null}
                 onClick={async () => {
                   await loadAllTransactions()
                 }}
