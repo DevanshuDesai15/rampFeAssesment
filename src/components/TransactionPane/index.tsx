@@ -1,20 +1,13 @@
-import { useCallback, useState } from "react"
+import { useCallback } from "react"
 import { InputCheckbox } from "../InputCheckbox"
 import { TransactionPaneComponent } from "./types"
-import { SuccessResponse } from "../../utils/types"
-import { fakeFetch } from "src/utils/fetch"
 
-export const TransactionPane: TransactionPaneComponent = ({ transaction }) => {
-  const [approved, setApproved] = useState(transaction.approved)
-
-  const setTransactionApproval = useCallback(
+export const TransactionPane: TransactionPaneComponent = ({ transaction, approved, setTransactionApproval }) => {
+  const handleCheckboxChange = useCallback(
     (newValue: boolean) => {
-      fakeFetch<SuccessResponse>("setTransactionApproval", {
-        transactionId: transaction.id,
-      })
-      setApproved(newValue)
+      setTransactionApproval(transaction.id, newValue)
     },
-    [transaction.id]
+    [setTransactionApproval, transaction.id]
   )
 
   return (
@@ -26,7 +19,7 @@ export const TransactionPane: TransactionPaneComponent = ({ transaction }) => {
           {transaction.employee.firstName} {transaction.employee.lastName} - {transaction.date}
         </p>
       </div>
-      <InputCheckbox id={transaction.id} checked={approved} onChange={setTransactionApproval} />
+      <InputCheckbox id={transaction.id} checked={approved} onChange={handleCheckboxChange} />
     </div>
   )
 }

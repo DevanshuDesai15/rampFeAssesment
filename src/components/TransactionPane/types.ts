@@ -3,6 +3,8 @@ import { Transaction } from "../../utils/types"
 
 type TransactionPaneProps = {
   transaction: Transaction
+  approved: boolean
+  setTransactionApproval: (transactionId: string, newValue: boolean) => void
 }
 
-export type TransactionPaneComponent = FunctionComponent<TransactionPaneProps>
+export type TransactionPaneComponent = React.FC<TransactionPaneProps>
